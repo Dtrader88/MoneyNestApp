@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoneyNest</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#23253b">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --font-family: 'Nunito', sans-serif;
+            --color-bg: #0f0c29; --color-surface: #23253b; --color-primary-text: #e0e0e0;
+            --color-secondary-text: #89f9fe; --color-border: #4242ff; --color-income: #15ffab;
+            --color-expense: #ff0099; --color-balance: #21d4fd; --color-accent: #fffa00;
+            --color-goals: #ff8c42; --color-recurring: #a955ff; --color-btn-border: #ff00cc;
+            --color-btn-shadow: #00ffd080; --color-btn-text: #21d4fd;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-family); color: var(--color-primary-text);
+            background: linear-gradient(120deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            margin: 0; display: flex; justify-content: center; padding: 24px 8px; min-height: 100vh;
+        }
+        .app-container { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 20px; padding-bottom: 80px; }
+        .app-header {
+            display: flex; align-items: center; justify-content: space-between; padding: 5px 15px; position: sticky;
+            top: 10px; z-index: 100; background: rgba(36, 36, 62, 0.85); backdrop-filter: blur(12px);
+            border: 1.5px solid var(--color-border); border-radius: 18px; box-shadow: 0 6px 24px #000a; min-height: 54px;
+        }
+        #back-btn { background: none; border: none; color: var(--color-balance); font-size: 2.2rem; cursor: pointer; display: none; padding: 0 10px 0 0; }
+        #back-btn.active { display: block; }
+        .app-header h1 { color: var(--color-primary-text); font-size: 1.35rem; font-weight: 700; flex-grow: 1; text-align: center; }
+        #settings-btn { background: none; border: none; cursor: pointer; padding: 5px; }
+        #settings-btn svg { width: 1.8rem; height: 1.8rem; fill: var(--color-secondary-text); transition: transform 0.3s, fill 0.3s; }
+        #settings-btn:hover svg { fill: var(--color-accent); transform: rotate(45deg); }
+        .view { display: none; flex-direction: column; gap: 22px; }
+        .view.active { display: flex; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
+        .dashboard-grid .metric.full-width { grid-column: 1 / -1; }
+        .metric {
+            background: var(--color-surface); padding: 18px; border-radius: 13px; text-align: center;
+            border-bottom: 3.5px solid; box-shadow: 0 6px 18px #000a; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .metric:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 10px 20px #000c; }
+        .metric h3 { font-size: 1rem; margin: 0 0 6px 0; color: var(--color-secondary-text); font-weight: 400; }
+        .metric p { font-size: 1.6rem; font-weight: 700; margin: 0; }
+        #ingresos-metric, .btn-income { border-color: var(--color-income); }
+        #gastos-metric, .btn-expense { border-color: var(--color-expense); }
+        #balance-metric, .btn-balance { border-color: var(--color-balance); }
+        #goals-metric, .btn-goals { border-color: var(--color-goals); }
+        .chart-container { height: 185px; }
+        .form-container, .list-container, .goals-container, .settings-container {
+            background-color: var(--color-surface); padding: 22px; border-radius: 15px; box-shadow: 0 2px 14px #1113;
+        }
+        h2, h3.section-title { text-align: center; font-weight: 700; }
+        h3.section-title { color: var(--color-accent); margin-top: 25px; margin-bottom: 10px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;}
+        .form-control { margin-bottom: 16px; }
+        .form-control label { font-size: 1rem; color: var(--color-secondary-text); margin-bottom: 5px; display: block; }
+        input, select {
+            width: 100%; box-sizing: border-box; background-color: var(--color-bg);
+            color: var(--color-primary-text); border: 1.5px solid var(--color-border);
+            border-radius: 8px; padding: 12px; font-family: var(--font-family); font-size: 1.04rem;
+        }
+        fieldset { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 15px; margin-top: 15px; }
+        legend { color: var(--color-accent); font-weight: 700; padding: 0 5px; }
+        .hidden { display: none; }
+        .btn {
+            padding: 12px 22px; border-radius: 8px; font-size: 1.08rem; font-weight: 700;
+            cursor: pointer; width: 100%; color: var(--color-btn-text); background: transparent;
+            border: 2px solid var(--color-btn-border); text-shadow: 0 0 6px var(--color-btn-text);
+            box-shadow: 0 0 6px var(--color-btn-shadow), 0 0 15px var(--color-btn-shadow) inset;
+            transition: color 0.23s, background-color 0.23s, box-shadow 0.22s;
+        }
+        .btn:hover { color: var(--color-surface); background-color: var(--color-btn-border); box-shadow: 0 0 24px var(--color-btn-shadow); }
+        .transaction-list, .goals-list, .recurring-list { list-style: none; padding: 0; }
+        .transaction-item, .goal-item, .recurring-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 11px 5px; border-bottom: 1px solid var(--color-border); }
+        .transaction-info, .goal-info, .recurring-info { flex-grow: 1; }
+        .transaction-actions, .goal-actions, .recurring-actions { display: flex; gap: 8px; }
+        .action-btn { background: none; border: none; cursor: pointer; font-size: 1.22rem; }
+        .edit-btn { color: var(--color-accent); }
+        .delete-btn { color: var(--color-expense); }
+        .pay-btn { color: var(--color-income); font-size: 1.5rem; }
+        .add-saving-btn { color: var(--color-income); font-size: 1.4rem; }
+        .goal-item, .recurring-item { flex-direction: column; align-items: stretch; gap: 8px; }
+        .goal-header, .recurring-header { display: flex; justify-content: space-between; width: 100%; }
+        .progress-bar-container { width: 100%; background-color: var(--color-bg); border-radius: 5px; height: 19px; }
+        .progress-bar { height: 100%; background-color: var(--color-goals); border-radius: 5px; }
+        .goal-details { display: flex; justify-content: space-between; font-size: 0.94rem; }
+        .filter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .filter-header h3 { margin: 0; font-size: 1.1em; color: var(--color-secondary-text); }
+        #show-filter-btn { font-size: 1.5rem; padding: 5px; color: var(--color-accent); }
+        .filter-dates { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; background-color: var(--color-surface); padding: 10px; border-radius: 10px; margin-bottom: 10px;}
+        .filter-dates label { color: var(--color-accent); font-size: 0.98rem; font-weight: 700; }
+        .filter-dates input[type="date"] {
+            color: var(--color-primary-text); background: var(--color-bg); border: 1.3px solid var(--color-accent);
+            border-radius: 7px; font-size: 0.98rem; padding: 5px 8px; min-width: 120px;
+        }
+        .theme-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 13px; }
+        .theme-btn {
+            padding: 8px 18px; border-radius: 5px; font-weight: 700; cursor: pointer; border: 2px solid var(--color-border);
+            color: var(--color-secondary-text); background: var(--color-bg); transition: all 0.19s;
+        }
+        .theme-btn.active { border-color: var(--color-accent); color: var(--color-accent); transform: scale(1.07); box-shadow: 0 0 12px var(--color-accent); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <button id="back-btn" title="Atrás">&lt;</button>
+            <h1 id="app-title">MoneyNest</h1>
+            <button id="settings-btn" title="Configuración"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.69-1.62-0.92L14.3,2.54c-0.05-0.24-0.28-0.41-0.54-0.41 h-3.83c-0.26,0-0.49,0.17-0.54,0.41L9.23,4.99c-0.59,0.23-1.12,0.54-1.62,0.92L5.22,4.95c-0.22-0.08-0.47,0-0.59,0.22L2.71,8.49 c-0.11,0.2-0.06,0.47,0.12,0.61l2.03,1.58C4.82,11.36,4.8,11.68,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.69,1.62,0.92l0.16,2.45 c0.05,0.24,0.28,0.41,0.54,0.41h3.83c0.26,0-0.49,0.17-0.54,0.41l0.16-2.45c0.59-0.23,1.12-0.54,1.62-0.92l2.39,0.96 c0.22,0.08,0.47,0-0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"></path></svg></button>
+        </header>
+    
+        <main id="view-dashboard" class="view active"></main>
+        <main id="view-list" class="view"></main>
+        <main id="view-goals" class="view"></main>
+        <main id="view-settings" class="view"></main>
+        <main id="view-form" class="view">
+            <div class="form-container">
+                <h2 id="form-title"></h2>
+                <form id="transaction-form">
+                    <div class="form-control"><label data-i18n="type" for="type"></label><select id="type" required><option data-i18n="income" value="income"></option><option data-i18n="expenses" value="expense"></option></select></div>
+                    <div class="form-control"><label data-i18n="category" for="category-input"></label><input autocomplete="off" id="category-input" list="category-datalist" required type="text"/><datalist id="category-datalist"></datalist></div>
+                    <div class="form-control"><label data-i18n="amount" for="amount"></label><input id="amount" min="0.01" required step="0.01" type="number"/></div>
+                    <div class="form-control"><label data-i18n="description" for="description"></label><input id="description" type="text"/></div>
+                    <div class="form-control"><label data-i18n="date" for="date"></label><input id="date" required type="date"/></div>
+                    <div class="form-control" style="display: flex; align-items: center; gap: 10px;">
+                        <label data-i18n="recurringTransaction" for="is-recurring" style="margin-bottom: 0;"></label>
+                        <input type="checkbox" id="is-recurring" style="width: auto; height: 1.5em;">
+                    </div>
+                    <fieldset id="frequency-options" class="hidden">
+                        <legend data-i18n="frequency"></legend>
+                        <div class="form-control">
+                            <label for="frequency-type" data-i18n="frequencyType"></label>
+                            <select id="frequency-type">
+                                <option value="monthly" data-i18n="monthly"></option><option value="weekly" data-i18n="weekly"></option><option value="bi-weekly" data-i18n="bi-weekly"></option>
+                            </select>
+                        </div>
+                        <div id="monthly-options" class="form-control hidden"><label for="frequency-day-month" data-i18n="dayOfMonth"></label><input type="number" id="frequency-day-month" min="1" max="31"></div>
+                        <div id="weekly-options" class="form-control hidden">
+                            <label for="frequency-day-week" data-i18n="dayOfWeek"></label>
+                            <select id="frequency-day-week">
+                                <option value="1" data-i18n="monday"></option><option value="2" data-i18n="tuesday"></option><option value="3" data-i18n="wednesday"></option>
+                                <option value="4" data-i18n="thursday"></option><option value="5" data-i18n="friday"></option><option value="6" data-i18n="saturday"></option><option value="0" data-i18n="sunday"></option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <button class="btn btn-income" data-i18n="save" type="submit"></button>
+                </form>
+            </div>
+        </main>
+        <main id="view-goal-form" class="view">
+          <div class="form-container">
+                <h2 id="goal-form-title"></h2>
+                <form id="goal-form">
+                     <div class="form-control"><label for="goal-name" data-i18n="goalName"></label><input type="text" id="goal-name" required></div>
+                     <div class="form-control"><label for="goal-target" data-i18n="targetAmount"></label><input type="number" id="goal-target" step="1" min="1" required></div>
+                     <button type="submit" class="btn btn-goals" data-i18n="save"></button>
+                </form>
+           </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- SETUP: Constants, State, and Helper functions ---
+            window.app = {};
+
+            const themes = {
+                cyberpunk: { name: 'Cyberpunk', colors: { '--color-bg': '#0f0c29', '--color-surface': '#23253b', '--color-primary-text': '#e0e0e0', '--color-secondary-text': '#89f9fe', '--color-border': '#4242ff', '--color-income': '#15ffab', '--color-expense': '#ff0099', '--color-balance': '#21d4fd', '--color-accent': '#fffa00', '--color-goals': '#ff8c42', '--color-btn-border': '#ff00cc', '--color-btn-shadow': '#00ffd080', '--color-btn-text': '#21d4fd'}},
+                miami_twilight: { name: 'Miami Twilight', colors: { '--color-bg': '#2C1B47', '--color-surface': '#4A2A69', '--color-primary-text': '#F5F5F5', '--color-secondary-text': '#D3A4F9', '--color-border': '#6C3F99', '--color-income': '#00F5D4', '--color-expense': '#FF2E63', '--color-balance': '#08D9D6', '--color-accent': '#F9A826', '--color-goals': '#FF2E63', '--color-btn-border': '#FF2E63', '--color-btn-shadow': '#FF2E6380', '--color-btn-text': '#00F5D4' }},
+                ocean_drive: { name: 'Ocean Drive', colors: { '--color-bg': '#051937', '--color-surface': '#0c2d48', '--color-primary-text': '#ffffff', '--color-secondary-text': '#0ff0fc', '--color-border': '#00a8cc', '--color-income': '#01c8ee', '--color-expense': '#fe53bb', '--color-balance': '#f7f7f7', '--color-accent': '#f5d300', '--color-goals': '#08d9d6', '--color-btn-border': '#fe53bb', '--color-btn-shadow': '#fe53bb80', '--color-btn-text': '#0ff0fc' }},
+                sunset_vice: { name: 'Sunset Vice', colors: { '--color-bg': '#3c1053', '--color-surface': '#542265', '--color-primary-text': '#f5f5f5', '--color-secondary-text': '#ff8c42', '--color-border': '#ff0080', '--color-income': '#ffa857', '--color-expense': '#f85032', '--color-balance': '#e0e0e0', '--color-accent': '#ffe27f', '--color-goals': '#8e54e9', '--color-btn-border': '#ff8c42', '--color-btn-shadow': '#ff8c4280', '--color-btn-text': '#ffe27f' }},
+            };
+
+            const translations = {
+                es: { appName: "MoneyNest Neon", income: "Ingresos", expenses: "Gastos", balance: "Balance", addMovement: "Añadir Movimiento", type: "Tipo", description: "Descripción", amount: "Monto", category: "Categoría", date: "Fecha", save: "Guardar", allIncome: "Ingresos", allExpense: "Gastos", allBalance: "Balance General", noTransactions: "No hay transacciones para mostrar.", completedTransactions: "Transacciones Completadas", upcomingRecurring: "Próximos Recurrentes", editMovement: "Editar Movimiento", confirmDelete: "¿Estás seguro de que quieres eliminar esta transacción?", goals: "Metas de Ahorro", addGoal: "Nueva Meta", goalName: "Nombre de la meta", targetAmount: "Monto Objetivo", noGoals: "No has creado ninguna meta.", saved: "Ahorrado", of: "de", confirmDeleteGoal: "¿Eliminar esta meta?", contributionAmount: "Monto a aportar", addSaving: "Aportar", savingFor: "Aportación para", settings: "Configuración", name: "Tu nombre o alias", language: "Idioma", themes: "Temas", from: "Desde", to: "Hasta", clearFilter: "Quitar filtro", applyFilter: "Aplicar", filter: "Filtro Personalizado", recurring: "Pagos Recurrentes", noRecurring: "No hay pagos recurrentes.", active: "Activos", recurringTransaction: "Transacción Recurrente", frequency: "Frecuencia", frequencyType: "Tipo de Frecuencia", monthly: "Mensual", weekly: "Semanal", "bi-weekly": "Quincenal", dayOfMonth: "Día del Mes", dayOfWeek: "Día de la Semana", monday: "Lunes", tuesday: "Martes", wednesday: "Miércoles", thursday: "Jueves", friday: "Viernes", saturday: "Sábado", sunday: "Domingo", markAsPaid: "Marcar como Pagado", nextDueDate: "Próximo Vencimiento", editRecurring: "Editar Recurrente", confirmDeleteRecurring: "¿Eliminar este pago recurrente?" },
+                en: { appName: "MoneyNest Neon", income: "Income", expenses: "Expenses", balance: "Balance", addMovement: "Add Movement", type: "Type", description: "Description", amount: "Amount", category: "Category", date: "Date", save: "Save", allIncome: "Income", allExpense: "Expenses", allBalance: "General Balance", noTransactions: "No transactions to show.", completedTransactions: "Completed Transactions", upcomingRecurring: "Upcoming Recurring", editMovement: "Edit Movement", confirmDelete: "Are you sure you want to delete this transaction?", goals: "Savings Goals", addGoal: "New Goal", goalName: "Goal name", targetAmount: "Target Amount", noGoals: "You haven't created any goals yet.", saved: "Saved", of: "of", confirmDeleteGoal: "Delete this goal?", contributionAmount: "Amount to contribute", addSaving: "Contribute", savingFor: "Contribution for", settings: "Settings", name: "Your name or alias", language: "Language", themes: "Themes", from: "From", to: "To", clearFilter: "Clear filter", applyFilter: "Apply", filter: "Custom Filter", recurring: "Recurring Payments", noRecurring: "No recurring payments.", active: "Active", recurringTransaction: "Recurring Transaction", frequency: "Frequency", frequencyType: "Frequency Type", monthly: "Monthly", weekly: "Weekly", "bi-weekly": "Bi-weekly", dayOfMonth: "Day of Month", dayOfWeek: "Day of Week", monday: "Monday", tuesday: "Tuesday", wednesday: "Wednesday", thursday: "Thursday", friday: "Friday", saturday: "Saturday", sunday: "Sunday", markAsPaid: "Mark as Paid", nextDueDate: "Next Due Date", editRecurring: "Edit Recurring", confirmDeleteRecurring: "Delete this recurring payment?" }
+            };
+            
+            let state = {};
+            let mainChart = null;
+            let filterDateFrom = null;
+            let filterDateTo = null;
+
+            const t = (key) => (translations[state.language] && translations[state.language][key]) || key;
+            const formatDate = (dateString) => new Date(dateString).toLocaleDateString(state.language, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+            const formatCurrency = (amount) => new Intl.NumberFormat(state.language === 'es' ? 'es-MX' : 'en-US', { style: 'currency', currency: 'USD' }).format(amount);
+
+            // --- STATE MANAGEMENT ---
+            function setDefaultState() {
+                const storedState = JSON.parse(localStorage.getItem('state')) || {};
+                state = {
+                    language: localStorage.getItem('language') || 'es',
+                    theme: localStorage.getItem('theme') || 'cyberpunk',
+                    profile: { name: "MoneyNest Neon" }, transactions: [], recurringTransactions: [], goals: [],
+                    categories: ['Salario', 'Comida', 'Transporte', 'Ocio', 'Ahorro Meta'],
+                    currentView: 'view-dashboard', isDateFilterVisible: false,
+                    editingTransactionId: null, editingRecurringId: null, editingGoalId: null, 
+                    listType: 'all', ...storedState
+                };
+            }
+            function saveState() {
+                localStorage.setItem('state', JSON.stringify(state));
+                localStorage.setItem('language', state.language);
+                localStorage.setItem('theme', state.theme);
+            }
+
+            // --- NAVIGATION AND CORE RENDERING ---
+            function showView(viewId) {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                document.getElementById(viewId).classList.add('active');
+                state.currentView = viewId;
+                document.getElementById('back-btn').classList.toggle('active', viewId !== 'view-dashboard');
+                saveState();
+            }
+            
+            function renderAll() {
+                saveState(); 
+                applyTheme(state.theme); 
+                translateUI();
+                const renderMap = {
+                    'view-dashboard': renderDashboard, 'view-list': renderTransactionList,
+                    'view-goals': renderGoals, 'view-settings': renderSettings
+                };
+                if (renderMap[state.currentView]) {
+                    renderMap[state.currentView]();
+                } else {
+                    renderDashboard(); 
+                }
+            }
+            
+            function applyTheme(themeKey) {
+                const theme = themes[themeKey] || themes.cyberpunk;
+                Object.entries(theme.colors).forEach(([key, value]) => document.documentElement.style.setProperty(key, value));
+                state.theme = themeKey;
+            }
+            
+            function translateUI() {
+                document.querySelectorAll('[data-i18n]').forEach(el => { if(el) el.textContent = t(el.dataset.i18n); });
+                document.getElementById('app-title').textContent = state.profile.name;
+            }
+            
+            // --- FILTER LOGIC ---
+            function filterTransactions(transactions) {
+                if (state.isDateFilterVisible && filterDateFrom && filterDateTo) {
+                    const from = new Date(filterDateFrom + "T00:00:00");
+                    const to = new Date(filterDateTo + "T23:59:59");
+                    return transactions.filter(t => { const txDate = new Date(t.date); return txDate >= from && txDate <= to; });
+                }
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                firstDay.setHours(0,0,0,0);
+                lastDay.setHours(23,59,59,999);
+                return transactions.filter(t => { const txDate = new Date(t.date); return txDate >= firstDay && txDate <= lastDay; });
+            }
+            
+            function createFilterControlsHTML() {
+                const monthName = new Date().toLocaleDateString(state.language, { month: 'long', year: 'numeric' });
+                const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                const filterControlsHTML = state.isDateFilterVisible ? `<div class="filter-dates">
+                        <label for="date-from">${t('from')}:</label><input type="date" id="date-from" value="${filterDateFrom || ''}">
+                        <label for="date-to">${t('to')}:</label><input type="date" id="date-to" value="${filterDateTo || ''}">
+                        <button class="btn" id="apply-date-filter" style="width:auto; font-size: 0.9em; padding: 8px 12px;">${t('applyFilter')}</button>
+                        <button class="btn" id="clear-date-filter" style="width:auto; font-size: 0.9em; padding: 8px 12px;">${t('clearFilter')}</button>
+                    </div>` : '';
+                return `<div class="filter-header"><h3>${state.isDateFilterVisible ? t('filter') : capitalizedMonth}</h3><button id="show-filter-btn" class="action-btn" style="background:transparent; border:none;">🔍</button></div>${filterControlsHTML}`;
+            }
+
+            function attachFilterEventListeners(view, renderer) {
+                view.querySelector('#show-filter-btn').addEventListener('click', () => {
+                    state.isDateFilterVisible = !state.isDateFilterVisible;
+                    if(!state.isDateFilterVisible) { filterDateFrom = null; filterDateTo = null; }
+                    renderer();
+                });
+                if(state.isDateFilterVisible) {
+                    view.querySelector('#apply-date-filter').addEventListener('click', () => {
+                        filterDateFrom = view.querySelector('#date-from').value;
+                        filterDateTo = view.querySelector('#date-to').value;
+                        renderer();
+                    });
+                    view.querySelector('#clear-date-filter').addEventListener('click', () => {
+                        state.isDateFilterVisible = false; filterDateFrom = null; filterDateTo = null; renderer();
+                    });
+                }
+            }
+
+            // --- VIEW RENDERERS ---
+            function renderDashboard() {
+                const view = document.getElementById('view-dashboard');
+                view.innerHTML = `
+                    ${createFilterControlsHTML()}
+                    <div class="dashboard-grid">
+                        <div class="metric" id="ingresos-metric"><h3>${t('income')}</h3><p id="ingresos-total"></p></div>
+                        <div class="metric" id="gastos-metric"><h3>${t('expenses')}</h3><p id="gastos-total"></p></div>
+                        <div class="metric full-width" id="balance-metric"><h3>${t('balance')}</h3><p id="balance-total"></p></div>
+                        <div class="metric full-width" id="goals-metric"><h3>${t('goals')}</h3><p id="goals-summary"></p></div>
+                    </div>
+                    <div class="chart-container"><canvas id="expense-chart"></canvas></div>
+                    <button id="dashboard-add-btn" class="btn btn-balance">${t('addMovement')}</button>`;
+                
+                attachFilterEventListeners(view, renderDashboard);
+                view.querySelector('#dashboard-add-btn').addEventListener('click', () => app.startNewTransaction());
+
+                const filteredTx = filterTransactions(state.transactions);
+                const income = filteredTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                const expense = filteredTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                document.getElementById('ingresos-total').textContent = formatCurrency(income);
+                document.getElementById('gastos-total').textContent = formatCurrency(expense);
+                document.getElementById('balance-total').textContent = formatCurrency(income - expense);
+                document.getElementById('goals-summary').textContent = `${state.goals.length} ${t('goals')}`;
+
+                const ctx = document.getElementById('expense-chart').getContext('2d');
+                if (mainChart) mainChart.destroy();
+                const expenseCategories = {};
+                filteredTx.filter(t => t.type === 'expense').forEach(t => { expenseCategories[t.category] = (expenseCategories[t.category] || 0) + t.amount; });
+                mainChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(expenseCategories), datasets: [{ data: Object.values(expenseCategories), backgroundColor: Object.values(themes[state.theme].colors).slice(5, 11), borderColor: themes[state.theme].colors['--color-surface'], borderWidth: 4 }] }, options: { cutout: '85%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+
+                document.getElementById('ingresos-metric').onclick = () => { state.listType = 'income'; showView('view-list'); renderAll(); };
+                document.getElementById('gastos-metric').onclick = () => { state.listType = 'expense'; showView('view-list'); renderAll(); };
+                document.getElementById('balance-metric').onclick = () => { state.listType = 'all'; showView('view-list'); renderAll(); };
+                document.getElementById('goals-metric').onclick = () => { showView('view-goals'); renderAll(); };
+            }
+            
+            function renderTransactionList() {
+                const view = document.getElementById('view-list');
+                const titleKey = `all${state.listType.charAt(0).toUpperCase() + state.listType.slice(1)}`;
+                
+                let transactionsToShow = state.transactions.filter(t => state.listType === 'all' || t.type === state.listType);
+                transactionsToShow = filterTransactions(transactionsToShow);
+                const completedListHTML = transactionsToShow.length === 0 ? `<li style="text-align:center; padding: 20px;">${t('noTransactions')}</li>`
+                    : transactionsToShow.sort((a,b) => new Date(b.date) - new Date(a.date)).map(tx => `
+                    <li class="transaction-item">
+                        <div class="transaction-info"><strong>${tx.category}</strong><small style="display:block;">${tx.description || ''}</small><small>${formatDate(tx.date)}</small></div>
+                        <div style="text-align:right;"><span style="color:${tx.type === 'income' ? 'var(--color-income)' : 'var(--color-expense)'}; font-weight:700;">${formatCurrency(tx.amount)}</span>
+                            <div class="transaction-actions"><button class="action-btn edit-btn" onclick="app.startEditTransaction(${tx.id})">&#9998;</button><button class="action-btn delete-btn" onclick="app.deleteTransaction(${tx.id})">&#10005;</button></div>
+                        </div></li>`).join('');
+
+                let recurringToShow = state.recurringTransactions.filter(t => state.listType === 'all' || t.type === state.listType);
+                const recurringListHTML = recurringToShow.length === 0 ? `<li style="text-align:center; padding: 20px;">${t('noRecurring')}</li>`
+                    : recurringToShow.sort((a,b) => new Date(a.nextDueDate) - new Date(b.nextDueDate)).map(tx => `
+                    <li class="recurring-item">
+                        <div class="recurring-header">
+                            <div class="recurring-info"><strong>${tx.category}</strong><small style="display:block; color: ${tx.type === 'income' ? 'var(--color-income)' : 'var(--color-expense)'};">${formatCurrency(tx.amount)}</small><small>${tx.description || ''}</small></div>
+                            <div class="recurring-actions"><button class="action-btn pay-btn" title="${t('markAsPaid')}" onclick="app.markAsPaid(${tx.id})">✓</button><button class="action-btn edit-btn" onclick="app.startEditRecurring(${tx.id})">&#9998;</button><button class="action-btn delete-btn" onclick="app.deleteRecurring(${tx.id})">&#10005;</button></div>
+                        </div><div style="width:100%; text-align:center; font-size: 0.9em; color: var(--color-accent); margin-top: 8px;">${t('nextDueDate')}: ${formatDate(tx.nextDueDate)}</div>
+                    </li>`).join('');
+
+                view.innerHTML = `<div class="list-container">
+                        <h2>${t(titleKey)}</h2>
+                        ${createFilterControlsHTML()}
+                        <h3 class="section-title">${t('completedTransactions')}</h3><ul class="transaction-list">${completedListHTML}</ul>
+                        <h3 class="section-title">${t('upcomingRecurring')}</h3><ul class="recurring-list">${recurringListHTML}</ul>
+                        <button class="btn btn-balance" id="list-add-btn" style="margin-top: 20px;">${t('addMovement')}</button>
+                    </div>`;
+                attachFilterEventListeners(view, renderTransactionList);
+                view.querySelector('#list-add-btn').addEventListener('click', () => app.startNewTransaction());
+            }
+
+            function renderGoals() {
+                const view = document.getElementById('view-goals');
+                view.innerHTML = `<div class="goals-container"><h2>${t('goals')}</h2><ul class="goals-list">
+                    ${state.goals.length === 0 ? `<li style="text-align:center; padding:20px;">${t('noGoals')}</li>` : state.goals.map(goal => {
+                        const percentage = goal.targetAmount > 0 ? Math.min(((goal.savedAmount || 0) / goal.targetAmount) * 100, 100) : 0;
+                        return `<li class="goal-item"><div class="goal-header"><span>${goal.name}</span><div class="goal-actions"><button class="action-btn add-saving-btn" onclick="app.addSavingToGoal(${goal.id})">&plus;</button><button class="action-btn edit-btn" onclick="app.startEditGoal(${goal.id})">&#9998;</button><button class="action-btn delete-btn" onclick="app.deleteGoal(${goal.id})">&#10005;</button></div></div><div class="progress-bar-container"><div class="progress-bar" style="width:${percentage}%;"></div></div><div class="goal-details"><span>${formatCurrency(goal.savedAmount || 0)} ${t('of')} ${formatCurrency(goal.targetAmount)}</span><span>${percentage.toFixed(1)}%</span></div></li>`;
+                    }).join('')}
+                    </ul><button class="btn btn-goals" id="add-goal-btn">${t('addGoal')}</button></div>`;
+                view.querySelector('#add-goal-btn').addEventListener('click', () => app.startNewGoal());
+            }
+
+            function renderSettings() {
+                const view = document.getElementById('view-settings');
+                view.innerHTML = `<div class="settings-container"><h2>${t('settings')}</h2>
+                    <div class="form-control"><label for="profile-name">${t('name')}</label><input autocomplete="off" id="profile-name" type="text" value="${state.profile.name}"></div>
+                    <div class="form-control"><label for="language-selector">${t('language')}</label><select id="language-selector"></select></div>
+                    <div class="settings-section"><h3>${t('themes')}</h3><div class="theme-buttons" id="theme-buttons-container">${
+                        Object.keys(themes).map(key => `<button class="theme-btn ${state.theme === key ? 'active' : ''}" data-theme="${key}">${themes[key].name}</button>`).join('')
+                    }</div></div></div>`;
+                
+                const langSelector = view.querySelector('#language-selector');
+                langSelector.innerHTML = `<option value="es">Español</option><option value="en">English</option>`;
+                langSelector.value = state.language;
+
+                view.querySelector('#profile-name').addEventListener('input', (e) => { state.profile.name = e.target.value || 'MoneyNest'; translateUI(); saveState(); });
+                langSelector.addEventListener('change', (e) => { state.language = e.target.value; renderAll(); });
+                view.querySelectorAll('.theme-btn').forEach(btn => btn.addEventListener('click', (e) => { state.theme = e.target.dataset.theme; renderAll(); }));
+            }
+
+            // --- FORM LISTENERS AND APP ACTIONS ---
+            app.startNewTransaction = () => {
+                state.editingTransactionId = null; state.editingRecurringId = null;
+                const form = document.getElementById('transaction-form'); form.reset();
+                document.getElementById('form-title').textContent = t('addMovement');
+                document.getElementById('date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('category-datalist').innerHTML = state.categories.map(c => `<option value="${c}"></option>`).join('');
+                document.getElementById('is-recurring').checked = false;
+                document.getElementById('frequency-options').classList.add('hidden');
+                showView('view-form');
+            };
+            
+            document.getElementById('is-recurring').addEventListener('change', (e) => {
+                document.getElementById('frequency-options').classList.toggle('hidden', !e.target.checked);
+                if(e.target.checked) document.getElementById('frequency-type').dispatchEvent(new Event('change'));
+            });
+            document.getElementById('frequency-type').addEventListener('change', (e) => {
+                document.getElementById('monthly-options').classList.toggle('hidden', e.target.value !== 'monthly');
+                document.getElementById('weekly-options').classList.toggle('hidden', e.target.value !== 'weekly');
+            });
+            document.getElementById('transaction-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const category = form.querySelector('#category-input').value.trim();
+                const amount = parseFloat(form.querySelector('#amount').value);
+                if(!category || isNaN(amount) || amount <= 0) return;
+                if (!state.categories.includes(category)) state.categories.push(category);
+
+                if (form.querySelector('#is-recurring').checked) {
+                    const recTx = { id: state.editingRecurringId || Date.now(), type: form.querySelector('#type').value, category, amount, description: form.querySelector('#description').value.trim(), frequency: form.querySelector('#frequency-type').value, startDate: form.querySelector('#date').value, frequencyDetail: null };
+                    recTx.frequencyDetail = recTx.frequency === 'monthly' ? form.querySelector('#frequency-day-month').value : recTx.frequency === 'weekly' ? form.querySelector('#frequency-day-week').value : null;
+                    recTx.nextDueDate = app.calculateNextDueDate(recTx.startDate, recTx.frequency);
+                    if (state.editingRecurringId) { state.recurringTransactions[state.recurringTransactions.findIndex(t => t.id === state.editingRecurringId)] = recTx; } 
+                    else { state.recurringTransactions.push(recTx); }
+                } else {
+                    const tx = { id: state.editingTransactionId || Date.now(), type: form.querySelector('#type').value, category, amount, description: form.querySelector('#description').value.trim(), date: new Date(form.querySelector('#date').value + 'T12:00:00Z').toISOString() };
+                    if (state.editingTransactionId) { state.transactions[state.transactions.findIndex(t => t.id === state.editingTransactionId)] = tx; } 
+                    else { state.transactions.push(tx); }
+                }
+                state.editingTransactionId = null; state.editingRecurringId = null;
+                showView('view-dashboard'); renderAll();
+            });
+            
+            document.getElementById('goal-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const goal = { id: state.editingGoalId || Date.now(), name: form.querySelector('#goal-name').value.trim(), targetAmount: parseFloat(form.querySelector('#goal-target').value), savedAmount: state.editingGoalId ? state.goals.find(g => g.id === state.editingGoalId).savedAmount : 0 };
+                if(!goal.name || isNaN(goal.targetAmount) || goal.targetAmount <= 0) return;
+                if (state.editingGoalId) { state.goals[state.goals.findIndex(g => g.id === state.editingGoalId)] = goal; } 
+                else { state.goals.push(goal); }
+                state.editingGoalId = null;
+                showView('view-goals'); renderAll();
+            });
+
+            app.markAsPaid = (id) => {
+                const recurringTx = state.recurringTransactions.find(t => t.id === id);
+                if(!recurringTx) return;
+                state.transactions.push({ id: Date.now(), type: recurringTx.type, category: recurringTx.category, amount: recurringTx.amount, description: recurringTx.description, date: new Date().toISOString() });
+                recurringTx.nextDueDate = app.calculateNextDueDate(recurringTx.nextDueDate, recurringTx.frequency);
+                renderAll();
+            };
+            
+            app.calculateNextDueDate = (startDateStr, frequency) => {
+                let nextDate = new Date(startDateStr + "T12:00:00Z");
+                const today = new Date();
+                if (new Date(startDateStr).getTime() > today.getTime() && startDateStr.split('T')[0] !== today.toISOString().split('T')[0]) {
+                    return nextDate.toISOString();
+                }
+                while(nextDate <= today) {
+                    if (frequency === 'monthly') { nextDate.setUTCMonth(nextDate.getUTCMonth() + 1); } 
+                    else if (frequency === 'bi-weekly') { nextDate.setUTCDate(nextDate.getUTCDate() + 14); } 
+                    else { nextDate.setUTCDate(nextDate.getUTCDate() + 7); }
+                }
+                return nextDate.toISOString();
+            };
+            
+            app.startEditTransaction = (id) => {
+                const tx = state.transactions.find(t => t.id === id); if (!tx) return;
+                app.startNewTransaction();
+                setTimeout(() => {
+                    state.editingTransactionId = id;
+                    document.getElementById('form-title').textContent = t('editMovement');
+                    const form = document.getElementById('transaction-form');
+                    form.querySelector('#type').value = tx.type; form.querySelector('#category-input').value = tx.category; form.querySelector('#amount').value = tx.amount;
+                    form.querySelector('#description').value = tx.description; form.querySelector('#date').value = tx.date.split('T')[0];
+                }, 0);
+            };
+            app.deleteTransaction = (id) => { if (confirm(t('confirmDelete'))) { state.transactions = state.transactions.filter(t => t.id !== id); renderAll(); } };
+
+            app.startEditRecurring = (id) => {
+                const tx = state.recurringTransactions.find(t => t.id === id); if (!tx) return;
+                app.startNewTransaction();
+                setTimeout(() => {
+                    state.editingRecurringId = id;
+                    document.getElementById('form-title').textContent = t('editRecurring');
+                    const form = document.getElementById('transaction-form');
+                    form.querySelector('#type').value = tx.type; form.querySelector('#category-input').value = tx.category; form.querySelector('#amount').value = tx.amount;
+                    form.querySelector('#description').value = tx.description; form.querySelector('#date').value = tx.startDate;
+                    const recurringCheckbox = form.querySelector('#is-recurring');
+                    recurringCheckbox.checked = true; recurringCheckbox.dispatchEvent(new Event('change'));
+                    const freqType = form.querySelector('#frequency-type');
+                    freqType.value = tx.frequency; freqType.dispatchEvent(new Event('change'));
+                    if (tx.frequency === 'monthly') { form.querySelector('#frequency-day-month').value = tx.frequencyDetail; } 
+                    else if (tx.frequency === 'weekly') { form.querySelector('#frequency-day-week').value = tx.frequencyDetail; }
+                }, 0);
+            };
+            app.deleteRecurring = (id) => { if (confirm(t('confirmDeleteRecurring'))) { state.recurringTransactions = state.recurringTransactions.filter(t => t.id !== id); renderAll(); } };
+            
+            app.startNewGoal = () => {
+                state.editingGoalId = null; 
+                document.getElementById('goal-form-title').textContent = t('addGoal'); 
+                document.getElementById('goal-form').reset(); 
+                showView('view-goal-form');
+            };
+            app.startEditGoal = (id) => { const goal = state.goals.find(g => g.id === id); if (!goal) return; state.editingGoalId = id; document.getElementById('goal-form-title').textContent = t('editMovement'); document.getElementById('goal-name').value = goal.name; document.getElementById('goal-target').value = goal.targetAmount; showView('view-goal-form'); };
+            app.deleteGoal = (id) => { if (confirm(t('confirmDeleteGoal'))) { state.goals = state.goals.filter(g => g.id !== id); renderAll(); } };
+            app.addSavingToGoal = (id) => {
+                const goal = state.goals.find(g => g.id === id); if (!goal) return;
+                const amountStr = prompt(`${t('contributionAmount')} para "${goal.name}":`);
+                if (amountStr) {
+                    const amount = parseFloat(amountStr);
+                    if (amount > 0) {
+                        goal.savedAmount = Math.min(goal.targetAmount, (goal.savedAmount || 0) + amount);
+                        state.transactions.push({ id: Date.now(), type: 'expense', category: 'Ahorro Meta', description: `${t('savingFor')} "${goal.name}"`, amount, date: new Date().toISOString() });
+                        renderAll();
+                    }
+                }
+            };
+
+            // --- INITIALIZATION ---
+            function init() {
+                setDefaultState();
+                document.getElementById('back-btn').addEventListener('click', () => { showView('view-dashboard'); renderAll(); });
+                document.getElementById('settings-btn').addEventListener('click', () => { showView('view-settings'); renderAll(); });
+                renderAll();
+            }
+            init();
+        });
+    </script>
+    
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }).catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+</body>
+</html>
